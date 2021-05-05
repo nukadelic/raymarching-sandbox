@@ -218,12 +218,8 @@ Shader "Raymarching/RmInfinity"
                 // keep track of the distance of the scene / surface 
                 float dS;
 
-                int ray_count = 0;
-
                 for (int i = 0; i < _RaycastSteps; i++)
                 {
-                    ray_count ++ ;
-
                     // ray marching position 
                     float3 p = ro + dO * rd;
 
@@ -238,7 +234,8 @@ Shader "Raymarching/RmInfinity"
                     if (dS < surf_dist || dO > _RaycastDist) break;
                 }
 
-                float performance = ( (float) ray_count ) / ( (float) _RaycastSteps );
+                // http://adrianb.io/2016/10/01/raymarching.html # Performance Testing
+                float performance = ( (float) i ) / ( (float) _RaycastSteps );
 
                 return float2( dO , performance );
             }
