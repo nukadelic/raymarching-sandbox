@@ -2,9 +2,9 @@ Shader "Raymarching/RmInfinity"
 {
     Properties
     {
-        _ColorA("Color A", Color) = (1,1,0,1)
-        _ColorB("Color B", Color) = (0,1,0,1)
-        _ColorSky("Color Sky", Color) = (0,0,0,1)
+        //_ColorA("Color A", Color) = (1,1,0,1)
+        //_ColorB("Color B", Color) = (0,1,0,1)
+        _ColorBg("Color Background", Color) = (0,0,0,1)
 
         _GridSize("GridSize", float) = 1
 
@@ -12,6 +12,7 @@ Shader "Raymarching/RmInfinity"
 
         _DrawBlockRadius("DrawBlockRadius", float ) = 1
 
+        [Enum(Off,0,On,1)] _RaycastCost("RaycastCost", Float) = 0
         [IntRange] _RaycastSteps("Raycast Steps", Range(10 , 150)) = 50
         [IntRange] _RaycastDist("Raycast Distance", Range(10 , 150)) = 50
         [IntRange] _SurfDist("Surf", Range(1,4)) = 1
@@ -36,13 +37,14 @@ Shader "Raymarching/RmInfinity"
 
             #include "UnityCG.cginc"
 
-            float4 _ColorSky;
-            float4 _ColorA;
-            float4 _ColorB;
+            float4 _ColorBg;
+            //float4 _ColorA;
+            //float4 _ColorB;
 
             float _GridSize;
             float4 _GridRatio;
 
+            float _RaycastCost;
             float _DrawBlockRadius;
             float _SurfDist;
             float _RaycastSteps;
@@ -205,9 +207,9 @@ Shader "Raymarching/RmInfinity"
                 //return float2( d , box_c );
             }
 
-            float raycast(float3 ro, float3 rd)
+            float2 raycast(float3 ro, float3 rd)
             {
-                float suft_dist = 1 / pow(10, _SurfDist);
+                float surf_dist = 1 / pow(10, _SurfDist);
 
                 // start at the camera position and march along the camera array 
                 // keep track of the [ dO ] distance from the Origin 
@@ -216,8 +218,12 @@ Shader "Raymarching/RmInfinity"
                 // keep track of the distance of the scene / surface 
                 float dS;
 
+                int ray_count = 0;
+
                 for (int i = 0; i < _RaycastSteps; i++)
                 {
+                    ray_count ++ ;
+
                     // ray marching position 
                     float3 p = ro + dO * rd;
 
@@ -229,10 +235,12 @@ Shader "Raymarching/RmInfinity"
                     dO += dS;
 
                     //// check if we hit an object ( or reached max / infinity ) 
-                    if (dO < suft_dist || dO > _RaycastDist) break;
+                    if (dS < surf_dist || dO > _RaycastDist) break;
                 }
 
-                return dO;
+                float performance = ( (float) ray_count ) / ( (float) _RaycastSteps );
+
+                return float2( dO , performance );
             }
 
             float3 GetNormal(float3 p)
@@ -318,7 +326,7 @@ Shader "Raymarching/RmInfinity"
                 }
 
 
-                col = lerp(lin, _ColorSky , 1.0 - exp(-0.0001 * t * t * t));
+                col = lerp(lin, _ColorBg , 1.0 - exp(-0.0001 * t * t * t));
                 col = clamp(col, 0.0, 1.0);
 
                 return col;
@@ -336,9 +344,13 @@ Shader "Raymarching/RmInfinity"
 
                 float4 col = 0;
 
-                float d = raycast(ro, rd);
+                float2 res1 = raycast(ro, rd);
 
-                if (d >= _RaycastDist )  discard;
+                float d = res1.x;
+
+                float perf = res1.y;
+
+                if (d >= _RaycastDist && _RaycastCost < 1 )  discard;
 
                 else
                 {
@@ -347,17 +359,23 @@ Shader "Raymarching/RmInfinity"
                     // float3 n = GetNormal(p);
                     // col.rgb = n;
 
-                    float2 res = Map(ro + d * rd);
+                    float2 res2 = Map(ro + d * rd);
 
-                    float c = res.y;
+                    float c = res2.y;
 
                     if (c > -.5)
                     {
                         float3 render_color = render(ro, rd, float2(d, c));
 
-                        col = float4(render_color, 1);
+                        if (_RaycastCost > 0)
+                        {
+                            col = float4(perf, 0, 0, 1);
+                        }
+                        else
+                        {
+                            col = float4(render_color, AA(res2.x));
+                        }
 
-                        //col = float4(render_color, AA(res.x));
                     }
                 }
 
