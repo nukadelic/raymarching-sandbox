@@ -6,16 +6,17 @@ Shader "Raymarching/RmInfinity"
         //_ColorB("Color B", Color) = (0,1,0,1)
         _ColorBg("Color Background", Color) = (0,0,0,1)
 
-        _GridSize("GridSize", float) = 1
+        _GridSize("GridSize", Range(0.2 , 10)) = 1
 
         _GridRatio("GridRatio", Vector) = (1,1,1,0)
 
         _DrawBlockRadius("DrawBlockRadius", float ) = 1
 
         [Enum(Off,0,On,1)] _RaycastCost("RaycastCost", Float) = 0
+        _RaycastStart("Raycast Start", float ) = 0
         [IntRange] _RaycastSteps("Raycast Steps", Range(10 , 150)) = 50
         [IntRange] _RaycastDist("Raycast Distance", Range(10 , 150)) = 50
-        [IntRange] _SurfDist("Surf", Range(1,4)) = 1
+        [IntRange] _SurfPow("Surf Pow", Range(1,20)) = 1
     }
 
         SubShader
@@ -46,7 +47,8 @@ Shader "Raymarching/RmInfinity"
 
             float _RaycastCost;
             float _DrawBlockRadius;
-            float _SurfDist;
+            float _SurfPow;
+            float _RaycastStart;
             float _RaycastSteps;
             float _RaycastDist;
 
@@ -152,68 +154,66 @@ Shader "Raymarching/RmInfinity"
                 return opU(value, float2(d, color));
             }
 
+            float zigzag(float x) 
+            {
+                // https://www.desmos.com/calculator/yyxml9e7fa
+
+                return abs(1 - (x % 2)) - 0.5;
+            }
+
             float2 Map(float3 p)
             {
                 float2 res = float2(1e10, 0);
 
-                float clip_d = sdSphere(p, 0.1);
+                //float clip_d = sdSphere(p, 0.1);
 
-                //float3 c = float3(1, 1e2, 1);
+                /*
+                float sdPlane(float3 p, float4x4 _globalTransform)
+                {
+                    float plane = mul(_globalTransform, float4(p, 1)).x;
+                    return plane;
+                }
+                */
 
-                //p = p % 0.8;
+                float3 c = normalize(_GridRatio.xyz) * _GridSize;
 
-                float3 c = normalize(_GridRatio.xyz ) * _GridSize;
+                res = opU( res , float2( p.y + c.y   , 1 ) );
+
 
                 float r = length(p) < _DrawBlockRadius  ? 0 : 0.1;
 
                 p += float3( 1e2, 1e2 , 1e2 );
                 
-                p += _Time.x    ;
+                p += float3( 0 , 0 , _Time.y );
+
+                float p1 = p;
                 
                 p = (p+.5*c) % (c) - 0.5 * c;
 
-                res = sdtBox(res, p - float3(_SinTime.z / 2, 0, 0), r , 2.6);
+                float t1 = sin( _Time.y / 2 );
+                
+                float t2 = sin(_Time.y * 1.5);
 
-                float t = sin(_Time.z * 1.5);
+                //float gx = p.x 
 
-                float3 delta = float3( t / 8, 0, 0);
+                float3 p2 = p + float3( 0 , t2 * sin( round( p1.x / c.x ) * 8 ) / 5  , 0 ) ;
 
-                res = sdtSphere(res, p + delta, r, 6.6);
+                res = sdtBox(res, p2, 2 * r * t1 , 2.6 );
+                res = sdtSphere(res, p2 , r * ( 1 - t1 ) , 6.6);
 
-                //res = ( res.x * -1 < clip_d ) ? res : float2( clip_d *  , 0 );
-
-                res = float2(max(res.x, clip_d * -1), res.y);
-
-                res = sdtSphere(res, p - float3(0, 0, t / 2), r, 7.6);
-
-                //float3 box_p = p - float3(0, 0, t / 4);
-                //float box_d = sdBox(box_p, .3);
-                //float box_c = 2.6;
-
-                //res = ( res.x > box_d ) ? res : float2(box_d,box_c);
-
-                //float d1 = sdBox(p - float3(.2, 0, 0) , .2);
-                //res = res.x > d1 ? res : float2(d1, 7.6);
-
-
-                //float d2 = sdCappedCylinder(p, .1, 4);
-                //res = res.x > d2 * -1 ? res : float2(d2 * -1 , 3);
-
-                //res = float2(max(res.x, d3 * -1), 2);
+                // CLIP 
+                //res = float2(max(res.x, clip_d * -1), res.y);
 
                 return res;
-
-                //float d = max(res.x, box_d);
-                //return float2( d , box_c );
             }
 
             float2 raycast(float3 ro, float3 rd)
             {
-                float surf_dist = 1 / pow(10, _SurfDist);
+                float surf_dist = 1.0 / ( 2 << ( (int) _SurfPow ) );
 
                 // start at the camera position and march along the camera array 
                 // keep track of the [ dO ] distance from the Origin 
-                float dO = 0;
+                float dO = _RaycastStart;// 0;
 
                 // keep track of the distance of the scene / surface 
                 float dS;
@@ -308,6 +308,7 @@ Shader "Raymarching/RmInfinity"
                     lin += 5.00 * spe * float3(1.30, 1.00, 0.70) * ks;
                 }
 
+
                 // back
                 //{
                 //    float dif = clamp(dot(nor, normalize(float3(0.5, 0.0, 0.6))), 0.0, 1.0) * clamp(1.0 - pos.y, 0.0, 1.0);
@@ -321,7 +322,6 @@ Shader "Raymarching/RmInfinity"
                     //dif *= occ;
                     //lin += col * 0.25 * dif * float3(1.00, 1.00, 1.00);
                 }
-
 
                 col = lerp(lin, _ColorBg , 1.0 - exp(-0.0001 * t * t * t));
                 col = clamp(col, 0.0, 1.0);

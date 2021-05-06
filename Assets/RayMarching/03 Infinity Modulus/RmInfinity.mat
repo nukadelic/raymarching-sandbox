@@ -65,18 +65,20 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _GridSize: 2.28
+    - _GridSize: 3
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _RaycastCost: 0
-    - _RaycastDist: 10
-    - _RaycastSteps: 23
+    - _RaycastDist: 30
+    - _RaycastStart: 1
+    - _RaycastSteps: 40
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _SurfDist: 2
+    - _SurfDist: 3
+    - _SurfPow: 5
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
