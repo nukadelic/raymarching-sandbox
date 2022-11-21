@@ -4,10 +4,12 @@ Shader "Raymarching/RmFractals"
     {
         //_ColorA("Color A", Color) = (1,1,0,1)
         //_ColorB("Color B", Color) = (0,1,0,1)
-        _ColorBg("Color Background", Color) = (0,0,0,1)
+        _Color("Color", Color) = (0,0,0,1)
 
         
         _Position("Position", Vector) = (1,1,1,0)
+        [IntRange] _Int("Recursive Count", Range(1,20)) = 4
+        _Scale("Scale", float ) = 1
 
         _DrawBlockRadius("DrawBlockRadius", float ) = 1
 
@@ -18,7 +20,7 @@ Shader "Raymarching/RmFractals"
         [IntRange] _SurfPow("Surf Pow", Range(1,20)) = 1
     }
 
-        SubShader
+    SubShader
     {
         Tags { "Queue" = "Transparent" "IgnoreProjector" = "True" "RenderType" = "Transparent" }
 
@@ -37,9 +39,7 @@ Shader "Raymarching/RmFractals"
 
             #include "UnityCG.cginc"
 
-            float4 _ColorBg;
-            //float4 _ColorA;
-            //float4 _ColorB;
+            float4 _Color;
 
             float4 _Position;
 
@@ -152,6 +152,7 @@ Shader "Raymarching/RmFractals"
                 return opU(value, float2(d, color));
             }
 
+            // Output Range : [ - 0.5 , + 0.5 ]
             float zigzag(float x) 
             {
                 // https://www.desmos.com/calculator/yyxml9e7fa
@@ -168,6 +169,7 @@ Shader "Raymarching/RmFractals"
                 return p;
             }
 
+            
             // recursive tetrahedron
             // http://blog.hvidtfeldts.net/index.php/2011/08/distance-estimated-3d-fractals-iii-folding-space/
             float sdTetrahedron( float3 p, int Iterations = 4, float Scale = 1 )
@@ -190,18 +192,42 @@ Shader "Raymarching/RmFractals"
 
                 return length(p) * pow(Scale, float(-n));
             }
+            
+            float sdTetrahedronFolding(float3 z, int Iterations = 8, float Scale = 1, float Pow = 2 )
+            {
+                float r;
+                int n = 0;
+                while (n < Iterations) {
+                    if (z.x + z.y < 0) z.xy = -z.yx; // fold 1
+                    if (z.x + z.z < 0) z.xz = -z.zx; // fold 2
+                    if (z.y + z.z < 0) z.zy = -z.yz; // fold 3	
+                    z = z * Pow - Scale * (Pow - 1.0);
+                    n++;
+                }
+                return (length(z)) * pow(Pow, float(-n));
+            }
+
+            float _Scale;
+            int _Int;
 
             float2 Map(float3 p)
             {
                 float r = length(p) < _DrawBlockRadius ? 0 : 1;
 
-                float2 res = float2(1e10, 0);
+                float2 res = float2( 1e10, 0 );
 
                 //res = opU( res , float2( p.y , 1 ) );
 
-                float d = sdTetrahedron( p + _Position  , 8, 2);
+                //float d = sdTetrahedron( p + _Position  , _Int, _Scale );
 
-                res = opU(res, float2(d, 3.6));
+                //float t = zigzag( _Time.x ) + 1;
+                //t = (1 - t * t);
+
+                float s = _Scale * 50; // * t 
+
+                float d = sdTetrahedronFolding( p , _Int , s, 2 );
+
+                res = opU( res, float2(d, 1 ) );
 
 
                 //res = opU(res, float2(sdSphere(p, .1), 6.6));
@@ -282,7 +308,7 @@ Shader "Raymarching/RmFractals"
                 float t = res.x;
                 float c = res.y;
 
-                float3 col = 0.2 + 0.2 * sin(c * 2.0 + float3(0.0, 1.0, 2.0));
+                float3 col = _Color * c; // 0.2 + 0.2 * sin(c * 2.0 + float3(0.0, 1.0, 2.0));
 
                 float3 pos = ro + rd * t;
                 float3 nor = GetNormal(pos);
@@ -329,7 +355,9 @@ Shader "Raymarching/RmFractals"
                     //lin += col * 0.25 * dif * float3(1.00, 1.00, 1.00);
                 }
 
-                col = lerp(lin, _ColorBg , 1.0 - exp(-0.0001 * t * t * t));
+                float3 background_color = 0;
+
+                col = lerp(lin, background_color , 1.0 - exp(-0.0001 * t * t * t));
                 col = clamp(col, 0.0, 1.0);
 
                 return col;

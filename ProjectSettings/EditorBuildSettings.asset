@@ -4,5 +4,13 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
-  m_configObjects: {}
+  m_Scenes:
+  - enabled: 0
+    path: Assets/RayMarching/03 Infinity Modulus/RmInfinity.unity
+    guid: c451a01f2ee03f341a570db80c88ca68
+  - enabled: 1
+    path: Assets/RayMarching/05 Torus Waves/RmTorusWaves2.unity
+    guid: a932575ba98230b4ab5268104d43f671
+  m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 86cbfaad5acad9349bc947f97729ce3d, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: bc549e7521195d1489e736235dcaf74e, type: 2}
